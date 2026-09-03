@@ -1,0 +1,7 @@
+{
+  "name": "Masjid TV Display",
+  "description": "Sistem Digital Signage & Pengelola Layar Informasi TV Masjid, Mushola, dan Majelis Taklim dengan Jadwal Sholat Akurat, Countdown Adzan & Iqamah, Slideshow Informasi, Running Text, dan Multi-Display.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

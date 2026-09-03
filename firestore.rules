@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Test connection doc
+    match /test/connection {
+      allow read, write: if true;
+    }
+
+    // Displays collection
+    match /displays/{displayCode} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Default deny for everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

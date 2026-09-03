@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+@layer utilities {
+  .font-amiri {
+    font-family: 'Amiri', serif;
+  }
+  .font-baskerville {
+    font-family: 'Libre Baskerville', Georgia, Cambria, serif;
+  }
+  .font-outfit {
+    font-family: 'Outfit', sans-serif;
+  }
+  .font-mono-digits {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  
+  /* TV Safe area helper */
+  .tv-safe-area {
+    padding: clamp(12px, 3vmin, 36px);
+  }
+}
+
+@keyframes marquee {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-100%, 0, 0);
+  }
+}
+
+.animate-marquee {
+  display: inline-block;
+  white-space: nowrap;
+  padding-left: 100%;
+  animation: marquee var(--marquee-duration, 50s) linear infinite;
+  will-change: transform;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+/* Islamic Geometric Background Pattern */
+.bg-islamic-pattern {
+  background-color: #0b1320;
+  background-image: radial-gradient(#1e3a5f 0.75px, transparent 0.75px), radial-gradient(#1e3a5f 0.75px, #0b1320 0.75px);
+  background-size: 30px 30px;
+  background-position: 0 0, 15px 15px;
+}
+
+.bg-emerald-pattern {
+  background-color: #042f2e;
+  background-image: radial-gradient(#0f766e 0.75px, transparent 0.75px), radial-gradient(#0f766e 0.75px, #042f2e 0.75px);
+  background-size: 28px 28px;
+  background-position: 0 0, 14px 14px;
+}
+
+.bg-natural-pattern {
+  background-color: #FDFBF7;
+  background-image: radial-gradient(#2D3E32 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* Hide scrollbar for TV Display */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
