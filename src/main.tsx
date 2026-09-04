@@ -19,6 +19,15 @@ if (typeof window !== 'undefined') {
       }
     }
   });
+
+  // Register offline Service Worker for TV Kiosk Mode
+  if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch((err) => {
+        console.debug('[SW] Registration notice:', err);
+      });
+    });
+  }
 }
 
 createRoot(document.getElementById('root')!).render(

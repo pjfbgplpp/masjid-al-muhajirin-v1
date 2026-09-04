@@ -17,7 +17,28 @@ export default function App() {
   const displaysRef = useRef<DisplayConfig[]>(displays);
   displaysRef.current = displays;
 
-  const [currentDisplayCode, setCurrentDisplayCode] = useState<string>('MASJID-01');
+  const [currentDisplayCode, setCurrentDisplayCode] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname;
+      if (path.startsWith('/display')) {
+        const parts = path.split('/').filter(Boolean);
+        if (parts.length >= 2) {
+          return parts[1].toUpperCase();
+        }
+      }
+      const saved = localStorage.getItem('masjid_tv_active_display_code');
+      if (saved) return saved.toUpperCase();
+    }
+    return 'MASJID-01';
+  });
+
+  const handleSelectDisplay = (code: string) => {
+    const cleanCode = code.toUpperCase();
+    setCurrentDisplayCode(cleanCode);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('masjid_tv_active_display_code', cleanCode);
+    }
+  };
   const [currentPath, setCurrentPath] = useState<string>(window.location.pathname);
   const [activeAdminTab, setActiveAdminTab] = useState<string>('overview');
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -268,8 +289,26 @@ export default function App() {
       <div className="relative w-screen h-screen overflow-hidden bg-black select-none">
         <TvDisplayScreen config={currentConfig} isPreview={false} />
 
-        {/* Subtle hover button in corner to return to Admin Dashboard */}
-        <div className="fixed top-2 right-2 z-50 opacity-0 hover:opacity-100 transition-opacity duration-300">
+        {/* Subtle hover bar in top corner to switch displays or return to Admin */}
+        <div className="fixed top-3 right-3 z-50 opacity-0 hover:opacity-100 transition-opacity duration-300 flex items-center gap-2">
+          {displays.length > 1 && (
+            <select
+              value={currentConfig.code}
+              onChange={(e) => {
+                const code = e.target.value;
+                handleSelectDisplay(code);
+                navigateTo(`/display/${code}`);
+              }}
+              className="px-2.5 py-1.5 bg-black/85 hover:bg-black text-white rounded-lg text-xs font-semibold border border-white/20 shadow-lg backdrop-blur-md cursor-pointer outline-none"
+            >
+              {displays.map((d) => (
+                <option key={d.code} value={d.code} className="bg-slate-900 text-white">
+                  {d.code}: {d.name}
+                </option>
+              ))}
+            </select>
+          )}
+
           <button
             type="button"
             onClick={() => navigateTo('/admin')}
@@ -293,13 +332,17 @@ export default function App() {
       isSaving={isSaving}
       saveMessage={saveMessage}
       onTabChange={setActiveAdminTab}
-      onSelectDisplay={(code) => setCurrentDisplayCode(code)}
+      onSelectDisplay={handleSelectDisplay}
       onConfigChange={handleConfigChange}
       onSaveConfig={handleSaveConfig}
       onCreateDisplay={handleCreateDisplay}
       onDeleteDisplay={handleDeleteDisplay}
       onExportPackage={handleExportZip}
       onOpenTvDisplay={handleOpenTvDisplay}
+      onDisplaysUpdated={(fresh) => {
+        setDisplays(fresh);
+        displaysRef.current = fresh;
+      }}
     />
   );
 }

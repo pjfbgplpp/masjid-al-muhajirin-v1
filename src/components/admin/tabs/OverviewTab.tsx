@@ -16,6 +16,7 @@ import {
   HelpCircle,
   ShieldCheck,
   ChevronRight,
+  Database,
 } from 'lucide-react';
 import { DisplayConfig, PrayerState } from '../../../types';
 import { TvDisplayScreen } from '../../tv/TvDisplayScreen';
@@ -231,6 +232,23 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-teal-400 transition-transform group-hover:translate-x-0.5" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onNavigateTab('supabase')}
+                className="w-full text-left p-3 rounded-xl bg-slate-950/60 hover:bg-slate-800/80 border border-white/5 hover:border-emerald-500/30 transition-all flex items-center justify-between group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center flex-shrink-0">
+                    <Database className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white group-hover:text-emerald-300">Database Supabase</h4>
+                    <p className="text-[11px] text-slate-400">Integrasi cloud database manual &amp; sinkronisasi TV</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-emerald-400 transition-transform group-hover:translate-x-0.5" />
               </button>
             </div>
           </div>

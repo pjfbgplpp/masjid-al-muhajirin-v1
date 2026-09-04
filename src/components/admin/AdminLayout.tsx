@@ -21,6 +21,7 @@ import {
   Download,
   Eye,
   Sliders,
+  Database,
 } from 'lucide-react';
 import { DisplayConfig, PrayerState } from '../../types';
 import { OverviewTab } from './tabs/OverviewTab';
@@ -36,6 +37,8 @@ import { QrCodeTab } from './tabs/QrCodeTab';
 import { AiAssistantTab } from './tabs/AiAssistantTab';
 import { TvGuideTab } from './tabs/TvGuideTab';
 import { TvPreviewTab } from './tabs/TvPreviewTab';
+import { SupabaseTab } from './tabs/SupabaseTab';
+import { isSupabaseConfigured } from '../../services/supabase';
 
 interface AdminLayoutProps {
   displays: DisplayConfig[];
@@ -52,6 +55,7 @@ interface AdminLayoutProps {
   onDeleteDisplay: (code: string) => void;
   onExportPackage: () => void;
   onOpenTvDisplay: (code?: string) => void;
+  onDisplaysUpdated?: (displays: DisplayConfig[]) => void;
 }
 
 export const AdminLayout: React.FC<AdminLayoutProps> = ({
@@ -69,12 +73,14 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   onDeleteDisplay,
   onExportPackage,
   onOpenTvDisplay,
+  onDisplaysUpdated,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navMenuItems = [
     // 1. SISTEM & PENGATURAN INTI (DI ATAS)
     { id: 'overview', label: 'Dashboard Utama', icon: LayoutDashboard, category: 'sistem' },
+    { id: 'supabase', label: 'Database Supabase', icon: Database, category: 'sistem' },
     { id: 'location', label: 'Lokasi & GPS Masjid', icon: MapPin, category: 'sistem' },
     { id: 'prayer', label: 'Jadwal Sholat & Iqamah', icon: Clock, category: 'sistem' },
     { id: 'displays', label: 'Multi-Display TV', icon: Tv, badge: displays.length, category: 'sistem' },
@@ -124,14 +130,19 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
 
         {/* Display Selector Dropdown & Quick Actions */}
         <div className="flex items-center gap-2 sm:gap-2.5">
-          {/* Cloud Firestore Status Badge */}
-          <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-[11px] font-semibold shadow-sm">
+          {/* Cloud Database Status Badge */}
+          <button
+            type="button"
+            onClick={() => onTabChange('supabase')}
+            className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[11px] font-semibold shadow-sm transition-colors cursor-pointer"
+            title="Klik untuk melihat status dan tabel Supabase"
+          >
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
             </span>
-            <span>Cloud Firestore Aktif</span>
-          </div>
+            <span>{isSupabaseConfigured() ? '⚡ Supabase Cloud Tersinkron' : 'Cloud Database Aktif'}</span>
+          </button>
 
           <div className="relative hidden md:block">
             <select
@@ -519,6 +530,13 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                 onNavigateTab={(tab) => onTabChange(tab)}
                 onOpenTvDisplay={() => onOpenTvDisplay(currentConfig.code)}
                 onExportPackage={onExportPackage}
+              />
+            )}
+
+            {activeTab === 'supabase' && (
+              <SupabaseTab
+                displays={displays}
+                onDisplaysUpdated={onDisplaysUpdated || (() => {})}
               />
             )}
 

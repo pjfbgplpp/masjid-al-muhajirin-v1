@@ -541,8 +541,15 @@ export const TvDisplayScreen: React.FC<TvDisplayScreenProps> = ({
 
             <div className="min-w-0">
               {config.layout.showMosqueName && (
-                <h1 className="text-xl md:text-2xl lg:text-3xl font-black tracking-tight drop-shadow-sm leading-tight text-white truncate">
-                  {config.location.mosqueName}
+                <h1 className="text-xl md:text-2xl lg:text-3xl font-black tracking-tight drop-shadow-sm leading-tight text-white truncate flex items-center gap-2">
+                  <span>{config.location.mosqueName || config.name}</span>
+                  {config.name &&
+                    config.location?.mosqueName &&
+                    config.name.trim().toLowerCase() !== config.location.mosqueName.trim().toLowerCase() && (
+                      <span className="text-[11px] md:text-xs px-2 py-0.5 rounded-full bg-white/15 border border-white/20 text-emerald-300 font-semibold uppercase tracking-wider shrink-0">
+                        {config.name}
+                      </span>
+                    )}
                 </h1>
               )}
               {config.layout.showTagline && config.location.tagline && (
