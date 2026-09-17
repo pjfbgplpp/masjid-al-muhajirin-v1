@@ -24,7 +24,6 @@ import {
   saveAllDisplaysToSupabase,
   isSupabaseConfigured,
 } from '../../../services/supabase';
-import { isFirestoreQuotaExceeded } from '../../../services/firebase';
 import { DisplayConfig } from '../../../types';
 
 interface SupabaseTabProps {
@@ -90,7 +89,6 @@ export const SupabaseTab: React.FC<SupabaseTabProps> = ({
   const [copiedSql, setCopiedSql] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
-  const firestoreExceeded = isFirestoreQuotaExceeded();
   const isConfigured = isSupabaseConfigured();
 
   // Test connection on load if configured
@@ -224,7 +222,7 @@ export const SupabaseTab: React.FC<SupabaseTabProps> = ({
         </div>
 
         {/* Status Indicators */}
-        <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 border-t border-slate-800/80">
+        <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 border-t border-slate-800/80">
           <div className="bg-slate-950/60 p-3 rounded-lg border border-slate-800">
             <div className="text-xs text-slate-400">Status Supabase</div>
             <div className="text-sm font-semibold flex items-center gap-1.5 mt-0.5">
@@ -254,20 +252,6 @@ export const SupabaseTab: React.FC<SupabaseTabProps> = ({
             <div className="text-sm font-semibold text-emerald-400 flex items-center gap-1.5 mt-0.5">
               <CheckCircle2 className="w-4 h-4 text-emerald-400" />
               <span>IndexedDB & Cache Aktif</span>
-            </div>
-          </div>
-
-          <div className="bg-slate-950/60 p-3 rounded-lg border border-slate-800">
-            <div className="text-xs text-slate-400">Status Firestore Bawaan</div>
-            <div className="text-sm font-semibold flex items-center gap-1.5 mt-0.5">
-              {firestoreExceeded ? (
-                <span className="text-amber-400 flex items-center gap-1">
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  Batas Kuota Gratis Tercapai (Aman Dialihkan ke Supabase)
-                </span>
-              ) : (
-                <span className="text-slate-400">Mode Cadangan</span>
-              )}
             </div>
           </div>
         </div>

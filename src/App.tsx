@@ -84,7 +84,7 @@ export default function App() {
   // Track whether the current display state has unsaved changes made by the user
   const isUserDirtyRef = useRef<boolean>(false);
 
-  // Load initial displays from Backend API / LocalStorage / Firestore
+  // Load initial displays from Backend API / LocalStorage / Supabase
   useEffect(() => {
     let isMounted = true;
     const loadData = async () => {
@@ -107,7 +107,7 @@ export default function App() {
 
     loadData();
 
-    // Subscribe to cross-tab & real-time Cloud Firestore updates
+    // Subscribe to cross-tab & real-time Supabase updates
     const unsubscribe = subscribeToConfigUpdates((fresh) => {
       if (fresh && fresh.length > 0) {
         // If user is currently actively typing in admin, don't overwrite user's in-progress typing
@@ -176,7 +176,7 @@ export default function App() {
     });
   };
 
-  // Background debounced auto-sync to Firestore ONLY when user has modified settings
+  // Background debounced auto-sync to Supabase ONLY when user has modified settings
   useEffect(() => {
     if (isLoading || !isUserDirtyRef.current) return;
     const timer = setTimeout(() => {
@@ -201,7 +201,7 @@ export default function App() {
         setDisplays(saved);
         displaysRef.current = saved;
       }
-      setSaveMessage(`✓ Pengaturan display "${currentConfig.name}" berhasil disimpan permanen ke Google Cloud Firestore & Penyimpanan Lokal!`);
+      setSaveMessage(`✓ Pengaturan display "${currentConfig.name}" berhasil disimpan permanen ke Supabase Cloud & Penyimpanan Lokal!`);
       setTimeout(() => setSaveMessage(''), 4000);
     } catch (err) {
       console.error('Save failed:', err);
