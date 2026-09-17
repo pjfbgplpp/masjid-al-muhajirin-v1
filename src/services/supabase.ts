@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
 import { DisplayConfig } from '../types';
 import { normalizeDisplayConfig } from './api';
@@ -5,14 +6,15 @@ import { normalizeDisplayConfig } from './api';
 const LOCAL_STORAGE_SUPABASE_URL = 'masjid_tv_supabase_url';
 const LOCAL_STORAGE_SUPABASE_KEY = 'masjid_tv_supabase_anon_key';
 
-// Helper to get environment variables safely
-const getEnvVar = (key: string): string => {
-  const metaEnv = (import.meta as any)?.env;
-  if (metaEnv && metaEnv[key]) {
-    return String(metaEnv[key]).trim();
-  }
-  return '';
+// Must stay as static `import.meta.env.X` reads — Vite only inlines this exact
+// form at build time; a dynamic lookup resolves to undefined in production.
+const VITE_ENV: Record<string, string | undefined> = {
+  VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
+  VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
 };
+
+// Helper to get environment variables safely
+const getEnvVar = (key: string): string => (VITE_ENV[key] || '').trim();
 
 export interface SupabaseConfigCredentials {
   url: string;
@@ -353,6 +355,21 @@ export function subscribeToSupabaseDisplays(
   let isCancelled = false;
   let activeChannel: RealtimeChannel | null = null;
   let clientUsed: SupabaseClient | null = null;
+  let refetchTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // Saving several displays at once emits one event per row; coalesce them so the
+  // full payload is downloaded once instead of once per row.
+  const scheduleRefetch = () => {
+    if (refetchTimer) clearTimeout(refetchTimer);
+    refetchTimer = setTimeout(async () => {
+      refetchTimer = null;
+      if (isCancelled) return;
+      const fresh = await fetchDisplaysFromSupabase();
+      if (!isCancelled && fresh && fresh.length > 0) {
+        onUpdate(fresh);
+      }
+    }, 1500);
+  };
 
   ensureSupabaseClient().then((supabase) => {
     if (isCancelled || !supabase) return;
@@ -363,12 +380,9 @@ export function subscribeToSupabaseDisplays(
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'displays' },
-          async (payload) => {
+          (payload) => {
             console.log('⚡ [Supabase Realtime] Event detected:', payload.eventType);
-            const fresh = await fetchDisplaysFromSupabase();
-            if (fresh && fresh.length > 0) {
-              onUpdate(fresh);
-            }
+            scheduleRefetch();
           }
         )
         .subscribe((status) => {
@@ -381,6 +395,10 @@ export function subscribeToSupabaseDisplays(
 
   return () => {
     isCancelled = true;
+    if (refetchTimer) {
+      clearTimeout(refetchTimer);
+      refetchTimer = null;
+    }
     if (activeChannel && clientUsed) {
       clientUsed.removeChannel(activeChannel).catch(() => {});
     }
