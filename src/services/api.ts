@@ -9,21 +9,6 @@ import { generateAndCache12MonthSchedule } from './prayerScheduleCache';
 import { cacheDisplayAssets } from './assetCache';
 import { performSmartSync } from './syncManager';
 import {
-  db,
-  testFirestoreConnection,
-  isFirestoreQuotaExceeded,
-  setFirestoreQuotaExceeded,
-} from './firebase';
-import {
-  collection,
-  doc,
-  getDocs,
-  getDoc,
-  setDoc,
-  deleteDoc,
-  onSnapshot,
-} from 'firebase/firestore';
-import {
   getSupabase,
   isSupabaseConfigured,
   ensureSupabaseClient,
@@ -98,20 +83,6 @@ export function broadcastConfigUpdate(displays: DisplayConfig[]): void {
   }
 }
 
-// Helper to clean payload for Cloud Firestore (removes undefined, strips functions, handles nulls)
-export function cleanForFirestore<T>(data: T): any {
-  if (data === null || data === undefined) return null;
-  return JSON.parse(JSON.stringify(data));
-}
-
-// Cache signatures of documents to prevent echo loops and redundant writes
-const lastCloudDocSignatures = new Map<string, string>();
-
-function getDisplaySignature(d: DisplayConfig): string {
-  const { updatedAt, ...rest } = d;
-  return JSON.stringify(cleanForFirestore(rest));
-}
-
 export function subscribeToConfigUpdates(callback: (displays: DisplayConfig[]) => void): () => void {
   if (typeof window === 'undefined') return () => {};
 
@@ -139,11 +110,15 @@ export function subscribeToConfigUpdates(callback: (displays: DisplayConfig[]) =
   }
   window.addEventListener('storage', handleStorage);
 
+  // Latest known snapshot, used as the comparison baseline when IndexedDB is unavailable
+  let lastKnownDisplays: DisplayConfig[] = [];
+
   // 1. Real-time Supabase Subscription
   let unsubscribeSupabase = () => {};
   try {
     unsubscribeSupabase = subscribeToSupabaseDisplays((fresh) => {
       if (fresh && fresh.length > 0) {
+        lastKnownDisplays = fresh;
         saveDisplaysToDb(fresh).catch(() => {});
         safeSetLocalStorage(STORAGE_KEY, fresh);
         safeSetLocalStorage(BACKUP_KEY, fresh);
@@ -154,91 +129,29 @@ export function subscribeToConfigUpdates(callback: (displays: DisplayConfig[]) =
     console.warn('⚠️ [Supabase] Realtime listener error:', err);
   }
 
-  // 2. High-reliability Polling Ticker (checks Supabase/Server every 10 seconds)
+  // 2. Fallback Polling Ticker (safety net when the realtime channel drops).
+  // Uses the differential sync: a metadata-only query decides whether the heavy
+  // payload is worth downloading, so an idle screen transfers almost nothing.
   let lastKnownJson = '';
   const pollTimer = setInterval(async () => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
     try {
-      // First try Supabase direct
-      if (isSupabaseConfigured()) {
-        const cloudData = await fetchDisplaysFromSupabase();
-        if (cloudData && cloudData.length > 0) {
-          const serialized = JSON.stringify(cloudData.map(d => ({ c: d.code, u: d.updatedAt })));
-          if (serialized !== lastKnownJson) {
-            lastKnownJson = serialized;
-            saveDisplaysToDb(cloudData).catch(() => {});
-            safeSetLocalStorage(STORAGE_KEY, cloudData);
-            callback(cloudData);
-            return;
-          }
-        }
-      }
-
-      // Fallback to server API
-      const res = await fetch('/api/displays', { signal: AbortSignal.timeout(3500) });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          const normalized = data.map(normalizeDisplayConfig);
-          const serialized = JSON.stringify(normalized.map(d => ({ c: d.code, u: d.updatedAt })));
-          if (serialized !== lastKnownJson) {
-            lastKnownJson = serialized;
-            saveDisplaysToDb(normalized).catch(() => {});
-            safeSetLocalStorage(STORAGE_KEY, normalized);
-            callback(normalized);
-          }
-        }
-      }
+      const fromDb = (await loadDisplaysFromDb()) || [];
+      const baseline = fromDb.length > 0 ? fromDb.map(normalizeDisplayConfig) : lastKnownDisplays;
+      await performSmartSync(baseline, (fresh) => {
+        if (!fresh || fresh.length === 0) return;
+        const normalized = fresh.map(normalizeDisplayConfig);
+        const serialized = JSON.stringify(normalized.map((d) => ({ c: d.code, u: d.updatedAt })));
+        if (serialized === lastKnownJson) return;
+        lastKnownJson = serialized;
+        lastKnownDisplays = normalized;
+        safeSetLocalStorage(STORAGE_KEY, normalized);
+        callback(normalized);
+      });
     } catch {
       // Ignore background poll errors
     }
-  }, 10000);
-
-  // 3. Real-time Cloud Firestore Listener (only if Supabase is NOT configured and Firestore quota is NOT exceeded)
-  let unsubscribeFirestore = () => {};
-  if (!isSupabaseConfigured() && !isFirestoreQuotaExceeded()) {
-    try {
-      const displaysCol = collection(db, 'displays');
-      unsubscribeFirestore = onSnapshot(
-        displaysCol,
-        (snapshot) => {
-          if (!snapshot.empty) {
-            const cloudDisplays: DisplayConfig[] = [];
-            snapshot.forEach((docSnap) => {
-              if (docSnap.exists()) {
-                const d = normalizeDisplayConfig(docSnap.data() as DisplayConfig);
-                const cleanCode = (d.code || docSnap.id).trim().toUpperCase();
-                lastCloudDocSignatures.set(cleanCode, getDisplaySignature(d));
-                cloudDisplays.push(d);
-              }
-            });
-            if (cloudDisplays.length > 0) {
-              saveDisplaysToDb(cloudDisplays).catch(() => {});
-              safeSetLocalStorage(STORAGE_KEY, cloudDisplays);
-              safeSetLocalStorage(BACKUP_KEY, cloudDisplays);
-              callback(cloudDisplays);
-            }
-          }
-        },
-        (error: any) => {
-          if (
-            error?.code === 'resource-exhausted' ||
-            error?.message?.includes('Quota limit exceeded') ||
-            error?.message?.includes('resource-exhausted')
-          ) {
-            setFirestoreQuotaExceeded(true);
-            try {
-              unsubscribeFirestore();
-            } catch {}
-          }
-          console.warn('[Firestore] Realtime snapshot notice:', error?.message || error);
-        }
-      );
-    } catch (err: any) {
-      if (err?.code === 'resource-exhausted' || err?.message?.includes('Quota limit exceeded')) {
-        setFirestoreQuotaExceeded(true);
-      }
-    }
-  }
+  }, 60000);
 
   return () => {
     clearInterval(pollTimer);
@@ -246,9 +159,6 @@ export function subscribeToConfigUpdates(callback: (displays: DisplayConfig[]) =
       syncBroadcastChannel.removeEventListener('message', handleBroadcast);
     }
     window.removeEventListener('storage', handleStorage);
-    try {
-      unsubscribeFirestore();
-    } catch {}
     try {
       unsubscribeSupabase();
     } catch {}
@@ -610,18 +520,6 @@ export async function createNewDisplay(newDisplay: Partial<DisplayConfig>): Prom
     // Ignore
   }
 
-  // Save to Firestore if eligible
-  if (!isSupabaseConfigured() && !isFirestoreQuotaExceeded()) {
-    try {
-      const sanitized = cleanForFirestore(created);
-      await setDoc(doc(db, 'displays', created.code), sanitized, { merge: true });
-    } catch (err: any) {
-      if (err?.code === 'resource-exhausted' || err?.message?.includes('Quota limit exceeded')) {
-        setFirestoreQuotaExceeded(true);
-      }
-    }
-  }
-
   return created;
 }
 
@@ -644,17 +542,6 @@ export async function deleteDisplay(code: string): Promise<boolean> {
     });
   } catch {
     // Ignore
-  }
-
-  // Delete from Firestore if eligible
-  if (!isSupabaseConfigured() && !isFirestoreQuotaExceeded()) {
-    try {
-      await deleteDoc(doc(db, 'displays', cleanCode));
-    } catch (err: any) {
-      if (err?.code === 'resource-exhausted' || err?.message?.includes('Quota limit exceeded')) {
-        setFirestoreQuotaExceeded(true);
-      }
-    }
   }
 
   // Delete from IndexedDB and local storage
